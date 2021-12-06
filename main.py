@@ -118,7 +118,13 @@ def classify(data_point, classes_with_nd_data, train_data_size):
   
   return most_probable_class, classes_scores
 
-def get_accurancy_data_split(filename, class_creating_attribute, train_percent, offset_percent=0):
+def get_accurancy_data_split(
+    filename,
+    class_creating_attribute,
+    train_percent,
+    offset_percent=0,
+    heuristic=lambda estimated, real: int(estimated == real),
+  ):
   classes_with_train_data, train_data_size, attributes, test_data = get_classes_data(
     filename,
     class_creating_attribute,
@@ -128,23 +134,27 @@ def get_accurancy_data_split(filename, class_creating_attribute, train_percent, 
 
   classes_with_nd_data = get_normal_distribution(classes_with_train_data, attributes)
 
-  guessed = 0
-  missed = 0
+  guessed_score = 0
+
+  test_data_size = len(test_data)
 
   for test_data_point in test_data:
     estimated_class, score_data = classify(test_data_point['attributes'], classes_with_nd_data, train_data_size)
     real_class = test_data_point[class_creating_attribute]
 
-    if estimated_class == real_class:
-      guessed += 1
-    else:
-      missed +=1
+    
+    guessed_score += heuristic(estimated_class, real_class)
 
-  accurancy = guessed/(guessed + missed)
+  accurancy = guessed_score/test_data_size
   
   return accurancy
 
-def get_accurancy_k_cross_validation(filename, class_creating_attribute, k):
+def get_accurancy_k_cross_validation(
+    filename,
+    class_creating_attribute,
+    k,
+    heuristic=lambda estimated, real: int(estimated == real),
+  ):
   train_percent = 1/k
   accurancy = 0
 
@@ -154,6 +164,7 @@ def get_accurancy_k_cross_validation(filename, class_creating_attribute, k):
       class_creating_attribute,
       train_percent,
       offset_percent=i*train_percent,
+      heuristic=heuristic,
     )
 
     accurancy += ith_accurancy
@@ -167,12 +178,18 @@ def get_accurancy_k_cross_validation(filename, class_creating_attribute, k):
 def main():
   filename = 'winequality-red.csv'
   class_creating_attribute = 'quality'
+  heuristic = lambda estimated, real: 0.25 ** abs(int(estimated) - int(real))
 
-  data_split_accurancy = get_accurancy_data_split(filename, class_creating_attribute, train_percent=0.6)
-  k_cross_accurancy = get_accurancy_k_cross_validation(filename, class_creating_attribute, k=5)
+  data_split_accurancy = get_accurancy_data_split(
+    filename, class_creating_attribute, train_percent=0.6, heuristic=heuristic
+  )
+  k_cross_accurancy = get_accurancy_k_cross_validation(
+    filename, class_creating_attribute, k=5, heuristic=heuristic
+  )
 
-  print(data_split_accurancy)
-  print(k_cross_accurancy)
+  print('\n\n\n\n ########### RESULTS ########## \n')
+  print(f'Data split result: {data_split_accurancy}')
+  print(f'K-cross validation result: {k_cross_accurancy}')
 
   
 
